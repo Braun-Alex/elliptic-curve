@@ -114,18 +114,43 @@ func DoubleElCPoints(a ElCPoint) (c ElCPoint) {
 // Scalar multiplying of elliptic curve point
 
 func ScalarMult(k big.Int, a ElCPoint) (c ElCPoint) {
+	var resultPoint ElCPoint
 	if k.Cmp(big.NewInt(0)) == 0 { // 0*P(x, y) = O(x, inf)
 		return ElCPoint{a.X, nil}
 	} else if k.Cmp(big.NewInt(0)) == -1 { // -kP(x, y) = kP(x, -y)
 		return ScalarMult(*new(big.Int).Mul(&k, big.NewInt(-1)),
 			ElCPoint{a.X, new(big.Int).Mul(a.Y, big.NewInt(-1))})
+	} else if k.Cmp(big.NewInt(1)) == 0 {
+		return a
 	} else {
-		bits := k.Text(2)
-		doublePoints := make([]ElCPoint, len(bits))
-		for _, point := range doublePoints {
+		bits := k.Text(2)                           // Binary representation of decimal scalar
+		doublePoints := make([]ElCPoint, len(bits)) // Allocation of slice with length of number of bits
+		for _, point := range doublePoints {        // P(x, y) + O(x, inf) = P(x, y)
 			point.X = big.NewInt(-1)
 			point.Y = nil
+		} // All double points in slice before computation are O(x, inf)
+		bufferPoint := a
+		bufferIndex := 0
+		for i := len(bits) - 1; i >= 0; i-- {
+			if bits[i] == OneInASCII { // Symbol bits[i] is "1"
+				doublePoints[i] = bufferPoint
+				for l := len(bits) - 1 - i; l > bufferIndex; l-- {
+					doublePoints[i] = DoubleElCPoints(doublePoints[i])
+				}
+				bufferPoint = doublePoints[i]
+				bufferIndex = len(bits) - 1 - i
+			}
 		}
+		for i := range doublePoints { // Initializing result
+			if doublePoints[i].Y != nil {
+				resultPoint = doublePoints[i]
+				bufferIndex = i
+				break
+			}
+		} // If bit is 0, the correspondent double point is O(x, inf); R(x, y) + O(x, inf) = R(x, y)
+		for i := bufferIndex + 1; i < len(doublePoints); i++ {
+			resultPoint = AddElCPoints(resultPoint, doublePoints[i])
+		} // Result will change while adding when the double point is not equal to O(x, inf)
 	}
-	return ElCPoint{big.NewInt(3), big.NewInt(5)}
+	return resultPoint
 }
