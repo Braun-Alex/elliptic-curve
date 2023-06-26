@@ -1,11 +1,14 @@
 package ec
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 )
 
 var OneInASCII byte = 49
+
+var HexEncoding int = 16
 
 // Elliptic curve y^2 = x^3 + 7 (mod p)
 
@@ -31,19 +34,19 @@ type ElCPoint struct {
 
 // Returning base point G on the elliptic curve y^2 = x^3 + 7 (mod p) (secp256k1)
 
-func BasePointGGet() (point ElCPoint) {
+func BasePointGGet() ElCPoint {
 	return ElCPoint{XInSecp256k1G, YInSecp256k1G}
 }
 
 // Returning ElCPoint structure wrapped in coordinates
 
-func ElCPointGen(x, y *big.Int) (point ElCPoint) {
+func ElCPointGen(x, y *big.Int) ElCPoint {
 	return ElCPoint{x, y}
 }
 
 // Checking that point is on curve y^2 = x^3 + 7 (mod p) (secp256k1)
 
-func IsOnCurveCheck(a ElCPoint) (c bool) {
+func IsOnCurveCheck(a ElCPoint) bool {
 	XExpression := new(big.Int).Mul(a.X, a.X)            // x^2 = x*x
 	XExpression.Mul(XExpression, a.X)                    // x^3 = x^2*x
 	YExpression := new(big.Int).Mul(a.Y, a.Y)            // y^2 = y*y
@@ -56,7 +59,7 @@ func IsOnCurveCheck(a ElCPoint) (c bool) {
 
 // Adding two different elliptic curve points
 
-func AddElCPoints(a, b ElCPoint) (c ElCPoint) {
+func AddElCPoints(a, b ElCPoint) ElCPoint {
 	if a.X == nil || b.X == nil { // Elliptic curve points must be valid
 		return ElCPoint{nil, nil}
 	} else if a.Y == nil && b.Y == nil { // O(x, inf) + O(x, inf) = O(x, inf)
@@ -89,7 +92,7 @@ func AddElCPoints(a, b ElCPoint) (c ElCPoint) {
 
 // Double multiplying of elliptic curve point
 
-func DoubleElCPoints(a ElCPoint) (c ElCPoint) {
+func DoubleElCPoints(a ElCPoint) ElCPoint {
 	if a.X == nil { // Elliptic curve point must be valid
 		return ElCPoint{nil, nil}
 	} else if a.Y == nil { // 2*O(x, inf) = O(x, inf)
@@ -113,7 +116,7 @@ func DoubleElCPoints(a ElCPoint) (c ElCPoint) {
 
 // Scalar multiplying of elliptic curve point
 
-func ScalarMult(k big.Int, a ElCPoint) (c ElCPoint) {
+func ScalarMult(k big.Int, a ElCPoint) ElCPoint {
 	var resultPoint ElCPoint
 	if k.Cmp(big.NewInt(0)) == 0 { // 0*P(x, y) = O(x, inf)
 		return ElCPoint{a.X, nil}
@@ -153,4 +156,51 @@ func ScalarMult(k big.Int, a ElCPoint) (c ElCPoint) {
 		} // Result will change while adding when the double point is not equal to O(x, inf)
 	}
 	return resultPoint
+}
+
+func ElCPointToString(point ElCPoint) string {
+	var leastSignificantBit string // Indicates that number is even or odd
+	if point.X == nil {
+		return "Not valid point"
+	}
+	if point.Y == nil {
+		return "Infinite point" // O(x, inf)
+	}
+	if point.Y.Bit(point.Y.BitLen()-1) == 0 {
+		leastSignificantBit = "02" // 0
+	} else {
+		leastSignificantBit = "03" // 1
+	}
+	return leastSignificantBit + point.X.Text(HexEncoding)
+}
+
+func StringToElCPoint(s string) ElCPoint {
+	leastSignificantBit := s[:2]
+	if leastSignificantBit != "02" && s[:2] != "03" {
+		return ElCPoint{nil, nil} // Not valid point
+	}
+	l := new(big.Int)
+	if leastSignificantBit == "02" {
+		l.SetInt64(0)
+	} else {
+		l.SetInt64(1)
+	}
+	x, y := new(big.Int), new(big.Int)
+	x.SetString(s[2:], HexEncoding)
+	y.Exp(x, big.NewInt(3), nil)     // x^3
+	y.Add(y, new(big.Int).Mul(x, A)) // x^3 + a*x
+	y.Add(y, B)                      // x^3 + a*x + b
+	hasRoot := y.ModSqrt(y, P)       // Square root of x^3 + a*x + b modulo p
+	if hasRoot == nil {
+		return ElCPoint{nil, nil} // Such point is not on elliptic curve
+	}
+	if l.Cmp(new(big.Int).Mod(y, big.NewInt(2))) == 0 {
+		return ElCPoint{x, y}
+	}
+	return ElCPoint{x, y.Sub(P, y)}
+}
+
+func PrintElCPoint(point ElCPoint) {
+	fmt.Printf("Elliptic curve point has such coordinates: \n%s\n%s\n",
+		point.X.Text(HexEncoding), point.Y.Text(HexEncoding))
 }
