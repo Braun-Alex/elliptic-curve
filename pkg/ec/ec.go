@@ -12,9 +12,9 @@ var HexEncoding = 16
 
 // Elliptic curve y^2 = x^3 + 7 (mod p)
 
-var A = big.NewInt(6)
+var A = big.NewInt(0)
 
-var B = big.NewInt(3)
+var B = big.NewInt(7)
 
 // Parameters (XInSecp256k1G, YInSecp256k1G) for G and P in secp256k1
 
@@ -24,7 +24,8 @@ var XInSecp256k1G, _ = new(big.Int).SetString(
 var YInSecp256k1G, _ = new(big.Int).SetString(
 	strings.ToLower("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"), 16)
 
-var P = big.NewInt(11)
+var P, _ = new(big.Int).SetString(
+	strings.ToLower("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"), 16)
 
 type ElCPoint struct {
 	X *big.Int
@@ -111,12 +112,12 @@ func DoubleElCPoints(a ElCPoint) ElCPoint {
 	} else if a.Y == nil { // 2*O(x, inf) = O(x, inf)
 		return ElCPoint{new(big.Int).Add(a.X, a.X), nil}
 	} else {
-		lambda := new(big.Int).Mul(a.X, a.X) // λ = x1^2
-		lambda.Mul(lambda, big.NewInt(3))    // λ *= 3
-		lambda.Add(lambda, A)                // λ += a
-		doubleY := new(big.Int).Add(a.Y, a.Y)
-		doubleY.ModInverse(doubleY, P)
-		lambda.Mul(lambda, doubleY)                           // λ /= (x2 - x1)
+		lambda := new(big.Int).Mul(a.X, a.X)                  // λ = x1^2
+		lambda.Mul(lambda, big.NewInt(3))                     // λ *= 3
+		lambda.Add(lambda, A)                                 // λ += a
+		doubleY := new(big.Int).Add(a.Y, a.Y)                 // 2y1 = y1 + y1
+		doubleY.ModInverse(doubleY, P)                        // (2y^1)^(-1)
+		lambda.Mul(lambda, doubleY)                           // λ *= (2y^1)^(-1)
 		lambda.Mod(lambda, P)                                 // λ %= p
 		result := ElCPoint{new(big.Int), new(big.Int)}        // r := ElCPoint{x3, y3}
 		result.X = new(big.Int).Mul(lambda, lambda)           // λ^2 = λ*λ; x3 = λ
