@@ -8,13 +8,13 @@ import (
 
 var OneInASCII byte = 49
 
-var HexEncoding int = 16
+var HexEncoding = 16
 
 // Elliptic curve y^2 = x^3 + 7 (mod p)
 
-var A = big.NewInt(0)
+var A = big.NewInt(6)
 
-var B = big.NewInt(7)
+var B = big.NewInt(3)
 
 // Parameters (XInSecp256k1G, YInSecp256k1G) for G and P in secp256k1
 
@@ -24,8 +24,7 @@ var XInSecp256k1G, _ = new(big.Int).SetString(
 var YInSecp256k1G, _ = new(big.Int).SetString(
 	strings.ToLower("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"), 16)
 
-var P, _ = new(big.Int).SetString(
-	strings.ToLower("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"), 16)
+var P = big.NewInt(11)
 
 type ElCPoint struct {
 	X *big.Int
@@ -57,6 +56,18 @@ func IsOnCurveCheck(a ElCPoint) bool {
 	return result.Cmp(big.NewInt(0)) == 0
 }
 
+func Eq(a, b ElCPoint) bool {
+	if a.X == nil || b.X == nil {
+		panic("Not valid points cannot be compared")
+	}
+	if a.Y == nil && b.Y == nil {
+		return true
+	} else if a.Y == nil || b.Y == nil {
+		return false
+	}
+	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
+}
+
 // Adding two different elliptic curve points
 
 func AddElCPoints(a, b ElCPoint) ElCPoint {
@@ -72,20 +83,22 @@ func AddElCPoints(a, b ElCPoint) ElCPoint {
 		return a
 	} else if a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0 { // P(x, y) + P(x, y) = 2P(x, y)
 		return DoubleElCPoints(a)
-	} else if a.X.Cmp(b.X) == 0 && new(big.Int).Add(a.Y, b.Y).Cmp(big.NewInt(0)) == 0 {
+	} else if a.X.Cmp(b.X) == 0 {
 		return ElCPoint{new(big.Int).Set(a.X), nil} // P(x, y) + P(x, -y) = O(x, inf)
 	} else {
-		difference := new(big.Int).Sub(b.Y, a.Y)               // d = y2 - y1
-		difference.Div(difference, new(big.Int).Sub(b.X, a.X)) // d /= (x2 - x1)
-		lambda := difference.Mod(difference, P)                // d %= p; λ = d
-		result := ElCPoint{new(big.Int), new(big.Int)}         // r := ElCPoint{x3, y3}
-		result.X = new(big.Int).Mul(lambda, lambda)            // λ^2 = λ*λ; x3 = λ
-		result.X.Sub(result.X, a.X)                            // x3 -= x1
-		result.X.Sub(result.X, b.X)                            // x3 -= x2
-		result.X.Mod(result.X, P)                              // x3 %= p
-		result.Y.Mul(lambda, new(big.Int).Sub(a.X, result.X))  // y3 = λ*(x1 - x3)
-		result.Y.Sub(result.Y, a.Y)                            // y3 -= y1
-		result.Y.Mod(result.Y, P)                              // y3 %= p
+		firstDifference := new(big.Int).Sub(b.Y, a.Y)           // firstD = y2 - y1
+		secondDifference := new(big.Int).Sub(b.X, a.X)          // secondD = x2 - x1
+		secondDifference.ModInverse(secondDifference, P)        // secondD^(-1) = (x2 - x1)^(-1)
+		secondDifference.Mul(firstDifference, secondDifference) // secondD *= firstD
+		lambda := secondDifference.Mod(secondDifference, P)     // secondD %= p; λ = secondD
+		result := ElCPoint{new(big.Int), new(big.Int)}          // r := ElCPoint{x3, y3}
+		result.X = new(big.Int).Mul(lambda, lambda)             // λ^2 = λ*λ; x3 = λ
+		result.X.Sub(result.X, a.X)                             // x3 -= x1
+		result.X.Sub(result.X, b.X)                             // x3 -= x2
+		result.X.Mod(result.X, P)                               // x3 %= p
+		result.Y.Mul(lambda, new(big.Int).Sub(a.X, result.X))   // y3 = λ*(x1 - x3)
+		result.Y.Sub(result.Y, a.Y)                             // y3 -= y1
+		result.Y.Mod(result.Y, P)                               // y3 %= p
 		return result
 	}
 }
@@ -98,10 +111,12 @@ func DoubleElCPoints(a ElCPoint) ElCPoint {
 	} else if a.Y == nil { // 2*O(x, inf) = O(x, inf)
 		return ElCPoint{new(big.Int).Add(a.X, a.X), nil}
 	} else {
-		lambda := new(big.Int).Mul(a.X, a.X)                  // λ = x1^2
-		lambda.Mul(lambda, big.NewInt(3))                     // λ *= 3
-		lambda.Add(lambda, A)                                 // λ += a
-		lambda.Div(lambda, new(big.Int).Add(a.Y, a.Y))        // λ /= (x2 - x1)
+		lambda := new(big.Int).Mul(a.X, a.X) // λ = x1^2
+		lambda.Mul(lambda, big.NewInt(3))    // λ *= 3
+		lambda.Add(lambda, A)                // λ += a
+		doubleY := new(big.Int).Add(a.Y, a.Y)
+		doubleY.ModInverse(doubleY, P)
+		lambda.Mul(lambda, doubleY)                           // λ /= (x2 - x1)
 		lambda.Mod(lambda, P)                                 // λ %= p
 		result := ElCPoint{new(big.Int), new(big.Int)}        // r := ElCPoint{x3, y3}
 		result.X = new(big.Int).Mul(lambda, lambda)           // λ^2 = λ*λ; x3 = λ
@@ -128,9 +143,9 @@ func ScalarMult(k big.Int, a ElCPoint) ElCPoint {
 	} else {
 		bits := k.Text(2)                           // Binary representation of decimal scalar
 		doublePoints := make([]ElCPoint, len(bits)) // Allocation of slice with length of number of bits
-		for _, point := range doublePoints {        // P(x, y) + O(x, inf) = P(x, y)
-			point.X = big.NewInt(-1)
-			point.Y = nil
+		for i := 0; i < len(doublePoints); i++ {    // P(x, y) + O(x, inf) = P(x, y)
+			doublePoints[i].X = big.NewInt(-1)
+			doublePoints[i].Y = nil
 		} // All double points in slice before computation are O(x, inf)
 		bufferPoint := a
 		bufferIndex := 0
