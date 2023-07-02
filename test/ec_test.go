@@ -1,7 +1,7 @@
 package test
 
 import (
-	"Elliptic_Curve/pkg/ec"
+	"elliptic-curve/pkg/ec"
 	"crypto/rand"
 	"math/big"
 	"strings"
