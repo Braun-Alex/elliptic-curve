@@ -1,4 +1,4 @@
-# Elliptic curve algebra
+# Elliptic-curve algebra
 
 Extented practise task № 8 for Distributed Lab Course "Cryptography in decentralized systems" 2023.
 
