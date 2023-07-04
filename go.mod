@@ -1,3 +1,3 @@
-module Elliptic_Curve
+module elliptic-curve
 
 go 1.19
