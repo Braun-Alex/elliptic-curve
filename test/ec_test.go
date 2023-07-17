@@ -1,10 +1,6 @@
 package test
 
 import (
-<<<<<<< HEAD
-=======
-	"elliptic-curve/pkg/ec"
->>>>>>> c3f142a4e406fa71fc1c5cadc33c9e70cc6e4e05
 	"crypto/rand"
 	"github.com/Braun-Alex/elliptic-curve/pkg/ec"
 	"math/big"
