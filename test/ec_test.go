@@ -1,8 +1,8 @@
 package test
 
 import (
-	"Elliptic_Curve/pkg/ec"
 	"crypto/rand"
+	"github.com/Braun-Alex/elliptic-curve/pkg/ec"
 	"math/big"
 	"strings"
 	"testing"
